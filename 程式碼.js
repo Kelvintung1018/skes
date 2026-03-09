@@ -2,7 +2,7 @@
 
 // ★★★ 請替換為您的 Web App 網址 (部署後取得) ★★★
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec";
-const FRONTEND_URL = "https://kelvintung1018.github.io/skes/index.html";
+const FRONTEND_URL = "https://skestc.github.io/115exam/index.html";
 const SHEET_NAME = "Candidates";
 const SETTINGS_SHEET_NAME = "Settings";
 

@@ -127,9 +127,9 @@
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-      <div class="d-flex align-items-center gap-2">
+ <div class="d-flex align-items-center gap-2 flex-wrap">
         <label class="fw-bold text-nowrap ms-2"><i class="fa-solid fa-layer-group me-1"></i>梯次:</label>
-        <select id="filterBatch" class="form-select filter-box" style="width: auto; min-width: 100px;">
+        <select id="filterBatch" class="form-select filter-box" style="width: auto; min-width: 90px;">
           <option value="">全部</option>
           <option value="1">第1梯</option>
           <option value="2">第2梯</option>
@@ -139,7 +139,7 @@
         </select>
 
         <label class="fw-bold text-nowrap ms-2"><i class="fa-solid fa-filter me-1"></i>科別:</label>
-        <select id="filterSubject" class="form-select filter-box" style="width: auto; min-width: 150px;">
+        <select id="filterSubject" class="form-select filter-box" style="width: auto; min-width: 110px;">
           <option value="">全部顯示</option>
           <option value="一般">一般</option>
           <option value="體育">體育</option>
@@ -147,6 +147,22 @@
           <option value="美術">美術</option>
           <option value="特教">特教</option>
           <option value="輔導">輔導</option>
+        </select>
+
+        <label class="fw-bold text-nowrap ms-2"><i class="fa-regular fa-paper-plane me-1"></i>狀態:</label>
+        <select id="filterStatus" class="form-select filter-box" style="width: auto; min-width: 110px;">
+          <option value="">所有狀態</option>
+          <option value="未發送">未發送</option>
+          <option value="信件已寄">信件已寄</option>
+          <option value="信件已讀">信件已讀</option>
+        </select>
+
+        <label class="fw-bold text-nowrap ms-2"><i class="fa-solid fa-reply me-1"></i>回覆:</label>
+        <select id="filterReply" class="form-select filter-box" style="width: auto; min-width: 110px;">
+          <option value="">所有回覆</option>
+          <option value="同意">同意</option>
+          <option value="婉拒">婉拒</option>
+          <option value="none">未回覆</option>
         </select>
       </div>
 
@@ -336,6 +352,25 @@
 
     $('#filterBatch').on('change', function(){ if(dataTable) dataTable.column(1).search(this.value).draw(); });
     $('#filterSubject').on('change', function(){ if(dataTable) dataTable.column(2).search(this.value).draw(); });
+    // 👇 新增：狀態 (第 6 欄，index 為 5)
+    $('#filterStatus').on('change', function(){ 
+      if(dataTable) dataTable.column(5).search(this.value).draw(); 
+    });
+
+    // 👇 新增：回覆 (第 7 欄，index 為 6)
+    $('#filterReply').on('change', function(){ 
+      if(dataTable) {
+        let val = this.value;
+        if (val === 'none') {
+          // 未回覆的格子文字是單純的 "-"，使用正則表達式精準匹配
+          dataTable.column(6).search('^-$', true, false).draw();
+        } else {
+          // 搜尋 "同意" 或 "婉拒" 或 "全部(空字串)"
+          dataTable.column(6).search(val, false, true).draw();
+        }
+      } 
+    });
+
 
     $('#tpl_email_invite, #tpl_confirm_yes, #tpl_confirm_no').summernote({
       height: 250, lang: 'zh-TW',
@@ -347,9 +382,11 @@
     });
   });
 
-  function reloadData() {
+function reloadData() {
     $('#filterBatch').val('');
     $('#filterSubject').val('');
+    $('#filterStatus').val(''); // 新增這行
+    $('#filterReply').val('');  // 新增這行
     $('#loading-overlay').fadeIn(100);
     loadData();
   }
@@ -596,17 +633,36 @@
     setTimeout(() => r.css('background-color',''), 1000);
 }
 
-  function exportCSV() {
+ function exportCSV() {
     if(!globalData||!globalData.list||globalData.list.length===0)return alert("無資料");
+    
+    // 取得 4 個選單的當前值
     const currentSubject = $('#filterSubject').val();
     const currentBatch = $('#filterBatch').val();
+    const currentStatus = $('#filterStatus').val();
+    const currentReply = $('#filterReply').val();
 
+    // 進行多重條件過濾
     const de = globalData.list.filter(r => {
-      let matchSubject = !currentSubject || r.subject === currentSubject;
       let matchBatch = !currentBatch || String(r.batch) === currentBatch;
-      return matchSubject && matchBatch;
+      let matchSubject = !currentSubject || r.subject === currentSubject;
+      
+      // 判斷寄信狀態
+      let matchStatus = true;
+      if (currentStatus === "未發送") matchStatus = (r.status !== "已發送" && r.status !== "已回覆");
+      else if (currentStatus === "信件已寄") matchStatus = (r.status === "已發送" || r.status === "已回覆") && !r.readTime;
+      else if (currentStatus === "信件已讀") matchStatus = !!r.readTime;
+
+      // 判斷回覆意願
+      let matchReply = true;
+      if (currentReply === "同意") matchReply = (r.willingness === "yes");
+      else if (currentReply === "婉拒") matchReply = (r.willingness === "no");
+      else if (currentReply === "none") matchReply = (!r.willingness || r.willingness.trim() === "");
+
+      return matchBatch && matchSubject && matchStatus && matchReply;
     });
-    if(de.length===0)return alert("無資料");
+    
+    if(de.length===0)return alert("目前篩選條件下無資料可匯出");
     
     let c="\uFEFF梯次,科別,姓名,單位,職稱,飲食,Email,電話,信件狀態,意願,回覆時間,備註\n";
     de.forEach(r=>{
@@ -616,7 +672,11 @@
       const cr=[r.batch, r.subject,r.name,r.unit||"",r.title||"",r.diet||"",r.email,ps,r.status,wt,r.replyTime||"",sn].map(f=>{if(String(f).startsWith('="'))return f;return `"${String(f).replace(/"/g,'""')}"`;}).join(",");
       c+=cr+"\n";
     });
-    const b=new Blob([c],{type:'text/csv;charset=utf-8;'});const l=document.createElement("a");l.href=URL.createObjectURL(b);l.download=`教甄委員_${new Date().toISOString().slice(0,10)}.csv`;l.style.visibility='hidden';document.body.appendChild(l);l.click();document.body.removeChild(l);
+    const b=new Blob([c],{type:'text/csv;charset=utf-8;'});
+    const l=document.createElement("a");
+    l.href=URL.createObjectURL(b);
+    l.download=`教甄委員_${new Date().toISOString().slice(0,10)}.csv`;
+    l.style.visibility='hidden';document.body.appendChild(l);l.click();document.body.removeChild(l);
   }
 
   function batchImportText() {

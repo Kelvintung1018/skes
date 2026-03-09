@@ -218,16 +218,38 @@ function getAdminData(timestamp) {
 // ==========================================
 
 function adminAddCandidate(f){
-  const lock=LockService.getScriptLock();try{lock.waitLock(10000);}catch(e){return{status:'error'};}
-  const s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const nr=s.getLastRow()+1;
-  s.getRange(nr,12).setNumberFormat("@");
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) { return {status:'error'}; }
   
-  const d=[Utilities.getUuid(),f.name,f.subject,f.email, f.batch||"1", "未發送","","","","","",String(f.phone||"").trim(),f.unit||"",f.title||"", "", f.diet||""];
+  const s = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const nr = s.getLastRow() + 1;
+  s.getRange(nr, 12).setNumberFormat("@"); // 設定電話欄位為純文字
   
-  s.getRange(nr,1,1,15).setValues([d]);
-  SpreadsheetApp.flush();lock.releaseLock();
-  return{status:'success'};
+  // ★ 修正：精準對應試算表的 15 個欄位
+  const d = [
+    Utilities.getUuid(),           // 1. uuid
+    f.name,                        // 2. 姓名
+    f.subject,                     // 3. 科別
+    f.email,                       // 4. Email
+    f.batch || "1",                // 5. 梯次
+    "未發送",                      // 6. 狀態
+    f.willingness || "",           // 7. 意願
+    f.diet || "",                  // 8. 飲食
+    f.note || "",                  // 9. 備註
+    "",                            // 10. 填寫時間 (回覆時間)
+    "",                            // 11. 已讀時間
+    String(f.phone || "").trim(),  // 12. 電話
+    f.unit || "",                  // 13. 單位
+    f.title || "",                 // 14. 職稱
+    ""                             // 15. 簡訊狀態
+  ];
+  
+  // 將 15 個欄位的陣列寫入試算表
+  s.getRange(nr, 1, 1, 15).setValues([d]);
+  SpreadsheetApp.flush();
+  lock.releaseLock();
+  
+  return {status:'success'};
 }
 
 function adminEditCandidate(f){

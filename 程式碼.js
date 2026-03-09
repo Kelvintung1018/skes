@@ -10,9 +10,20 @@ const SETTINGS_SHEET_NAME = "Settings";
 // 1. API 路由設定 (doGet / doPost)
 // ==========================================
 
-// 處理 GET 請求 (前端讀取資料)
+// 處理 GET 請求 (前端讀取資料 & 信件追蹤)
 function doGet(e) {
-  var action = e.parameter.action;
+  // 建立參數的簡寫
+  const p = e.parameter;
+
+  // ★ 加入您提供的信件已讀追蹤 (Tracking Pixel) 程式碼
+  if (p.track && p.uid) {
+    recordEmailOpen(p.uid);
+    const d = Utilities.base64Decode("R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==");
+    return ContentService.createTextOutput("").append(d).setMimeType(ContentService.MimeType.PNG);
+  }
+
+  // 以下為原有的 API 路由處理
+  var action = p.action;
   var data;
 
   try {
@@ -21,13 +32,14 @@ function doGet(e) {
     } else if (action === 'getSettingsData') {
       data = getSettingsData();
     } else if (action === 'getCandidateInfo') {
-      data = getCandidateInfo(e.parameter.uid);
+      data = getCandidateInfo(p.uid);
     } else if (action === 'getSmsConfig') {
       data = getSmsConfig();
     } else {
       return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 GET 請求' })).setMimeType(ContentService.MimeType.JSON);
     }
     
+    // 統一回傳格式
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: data }))
                          .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -57,6 +69,7 @@ function doPost(e) {
     else if (action === 'adminSendSMS') { responseData = adminSendSMS(payload.ids, payload.template); }
     else if (action === 'saveSettingsData') { responseData = saveSettingsData(payload); }
     else if (action === 'submitForm') { responseData = submitForm(payload); }
+    else if (action === 'verifyLogin') { responseData = verifyLogin(payload.username, payload.password); }
     else {
       return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 POST 請求' })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -643,4 +656,30 @@ function onOpen(){
     .addItem(' 初始化/修復 資料庫','initCandidatesSheet')
     .addItem(' 強制更新預設信件範本','resetDefaultTemplates')
     .addToUi();
+}
+
+// ==========================================
+// 8. 登入驗證功能
+// ==========================================
+function verifyLogin(username, password) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("User");
+  
+  if (!sheet) {
+    return { status: 'error', message: '系統找不到 User 分頁，請聯絡管理員。' };
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  
+  // 假設第一列是標題，從第二列開始比對
+  for (let i = 1; i < data.length; i++) {
+    let rowUser = String(data[i][0]).trim();
+    let rowPass = String(data[i][1]).trim();
+    
+    if (rowUser === username && rowPass === password) {
+      return { status: 'success', message: '登入成功' };
+    }
+  }
+  
+  return { status: 'error', message: '帳號或密碼錯誤！' };
 }

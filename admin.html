@@ -28,10 +28,31 @@
     .bg-light-info    { background: #e0f7fa; color: #006064; }
     .note-modal-backdrop { z-index: 1050; }
     .note-modal-content { position: relative; z-index: 1060; }
+    /* 登入視窗樣式 */
+    .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f2f5; z-index: 10000; display: flex; justify-content: center; align-items: center; }
+    .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
   </style>
 </head>
 <body>
-
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card">
+      <div class="text-center mb-4">
+        <h3 class="fw-bold text-primary"><i class="fa-solid fa-lock me-2"></i>系統登入</h3>
+        <p class="text-muted">請輸入管理員帳號密碼</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="mb-3">
+          <label class="form-label fw-bold">帳號</label>
+          <input type="text" class="form-control" id="loginUser" required placeholder="請輸入帳號">
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-bold">密碼</label>
+          <input type="password" class="form-control" id="loginPass" required placeholder="請輸入密碼">
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="loginBtn">登入系統</button>
+      </form>
+    </div>
+  </div>
   <div id="loading-overlay" class="loading-overlay">
     <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
     <h5 class="text-muted fw-bold">數據處理中...</h5>
@@ -301,8 +322,8 @@
   let globalData = null;
 
   $(document).ready(function() {
-    loadData();
-    
+    //loadData();
+      
     setTimeout(function() {
       if ($('#loading-overlay').is(':visible')) {
         $('#loading-overlay').fadeOut();
@@ -332,6 +353,48 @@
     $('#loading-overlay').fadeIn(100);
     loadData();
   }
+
+  // 處理登入動作
+  function handleLogin(event) {
+    event.preventDefault(); // 防止表單重新整理頁面
+    
+    const user = $('#loginUser').val();
+    const pass = $('#loginPass').val();
+    const btn = $('#loginBtn');
+    
+    // 按鈕狀態改為載入中
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>驗證中...');
+    
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        action: 'verifyLogin', 
+        data: { username: user, password: pass } 
+      })
+    })
+    .then(response => response.json())
+    .then(result => {
+      // 確保相容回傳格式
+      const resData = result.status ? result : (result.data || {});
+      
+      if (resData.status === 'success') {
+        // 登入成功：隱藏登入畫面，並開始載入後台資料
+        $('#login-overlay').fadeOut(500, function() {
+           $('#loading-overlay').fadeIn(100);
+           loadData(); // ★ 在這裡才真正去抓取資料
+        });
+      } else {
+        // 登入失敗
+        alert(resData.message || '登入失敗，請檢查帳號密碼。');
+        btn.prop('disabled', false).text('登入系統');
+      }
+    })
+    .catch(err => {
+      alert("連線發生錯誤：" + err);
+      btn.prop('disabled', false).text('登入系統');
+    });
+  }
+
 
   // 1. 讀取資料 (改為 fetch GET)
   function loadData() {

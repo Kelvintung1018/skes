@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>教甄委員管理後台</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+  
+  <style>
+    body { background-color: #f0f2f5; font-family: 'Inter', sans-serif; padding-bottom: 40px;}
+    .admin-header { background: white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;}
+    .card-box { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+    .filter-box { max-width: 200px; }
+    .stat-card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-3px); }
+    .icon-box { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 15px; }
+    .bg-light-primary { background: #e3f2fd; color: #1976d2; }
+    .bg-light-warning { background: #fff3e0; color: #ef6c00; }
+    .bg-light-success { background: #e8f5e9; color: #2e7d32; }
+    .bg-light-danger  { background: #ffebee; color: #c62828; }
+    .bg-light-info    { background: #e0f7fa; color: #006064; }
+    .note-modal-backdrop { z-index: 1050; }
+    .note-modal-content { position: relative; z-index: 1060; }
+  </style>
+</head>
+<body>
+
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+    <h5 class="text-muted fw-bold">數據處理中...</h5>
+    <small class="text-muted mt-2" id="loading-timer">正在連線資料庫...</small>
+  </div>
+
+  <div class="admin-header d-flex justify-content-between align-items-center">
+    <h4 class="m-0 fw-bold text-dark"><i class="fa-solid fa-chart-line me-2 text-primary"></i>教甄委員管理後台</h4>
+    <button class="btn btn-light border text-primary fw-bold" onclick="reloadData()">
+      <i class="fa-solid fa-rotate-right me-1"></i>重新整理
+    </button>
+  </div>
+
+  <div class="container-fluid px-4">
+    
+    <div class="row row-cols-1 row-cols-md-5 g-3 mb-4">
+      <div class="col">
+        <div class="card stat-card p-3 h-100" onclick="showStatDetails('total')" style="cursor: pointer;">
+          <div class="d-flex align-items-center">
+            <div class="icon-box bg-light-primary flex-shrink-0"><i class="fa-solid fa-users"></i></div>
+            <div class="overflow-hidden">
+                <h6 class="text-muted mb-0 text-nowrap">徵詢總數</h6>
+                <h3 class="fw-bold mb-0" id="stat-total">-</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card stat-card p-3 h-100" onclick="showStatDetails('read')" style="cursor: pointer;">
+          <div class="d-flex align-items-center">
+            <div class="icon-box bg-light-warning flex-shrink-0"><i class="fa-regular fa-envelope-open"></i></div>
+            <div class="overflow-hidden">
+                <h6 class="text-muted mb-0 text-nowrap">信件已讀</h6>
+                <h3 class="fw-bold mb-0" id="stat-read">-</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card stat-card p-3 h-100" onclick="showStatDetails('agree')" style="cursor: pointer;">
+          <div class="d-flex align-items-center">
+            <div class="icon-box bg-light-success flex-shrink-0"><i class="fa-solid fa-check"></i></div>
+            <div class="overflow-hidden">
+                <h6 class="text-muted mb-0 text-nowrap">同意擔任</h6>
+                <h3 class="fw-bold mb-0 text-success" id="stat-agree">-</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card stat-card p-3 h-100" onclick="showStatDetails('reject')" style="cursor: pointer;">
+          <div class="d-flex align-items-center">
+            <div class="icon-box bg-light-danger flex-shrink-0"><i class="fa-solid fa-xmark"></i></div>
+            <div class="overflow-hidden">
+                <h6 class="text-muted mb-0 text-nowrap">婉拒邀請</h6>
+                <h3 class="fw-bold mb-0 text-danger" id="stat-reject">-</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card stat-card p-3 h-100" onclick="showStatDetails('diet')" style="cursor: pointer;">
+          <div class="d-flex align-items-center">
+            <div class="icon-box bg-light-info flex-shrink-0"><i class="fa-solid fa-utensils"></i></div>
+            <div class="overflow-hidden">
+                <h6 class="text-muted mb-0 text-nowrap">飲食統計</h6>
+                <h5 class="fw-bold mb-0 text-dark" id="stat-diet" style="font-size: 1.1rem;">-</h5>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <label class="fw-bold text-nowrap ms-2"><i class="fa-solid fa-layer-group me-1"></i>梯次:</label>
+        <select id="filterBatch" class="form-select filter-box" style="width: auto; min-width: 100px;">
+          <option value="">全部</option>
+          <option value="1">第1梯</option>
+          <option value="2">第2梯</option>
+          <option value="3">第3梯</option>
+          <option value="4">第4梯</option>
+          <option value="5">第5梯</option>
+        </select>
+
+        <label class="fw-bold text-nowrap ms-2"><i class="fa-solid fa-filter me-1"></i>科別:</label>
+        <select id="filterSubject" class="form-select filter-box" style="width: auto; min-width: 150px;">
+          <option value="">全部顯示</option>
+          <option value="一般">一般</option>
+          <option value="體育">體育</option>
+          <option value="音樂">音樂</option>
+          <option value="美術">美術</option>
+          <option value="特教">特教</option>
+          <option value="輔導">輔導</option>
+        </select>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap justify-content-end">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fa-solid fa-plus me-1"></i>新增</button>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal"><i class="fa-solid fa-file-import me-1"></i>匯入</button>
+        <button class="btn btn-secondary" onclick="exportCSV()"><i class="fa-solid fa-file-export me-1"></i>匯出</button>
+        
+        <button class="btn btn-dark" onclick="openTemplateModal()"><i class="fa-solid fa-pen-to-square me-1"></i>範本設定</button>
+        
+        <div class="vr"></div> 
+        <button class="btn btn-warning" onclick="resendSelected()"><i class="fa-regular fa-envelope me-1"></i>寄信</button>
+        <button class="btn btn-info text-white" onclick="openSMSModal()"><i class="fa-regular fa-comment-dots me-1"></i>簡訊</button>
+        <button class="btn btn-danger" onclick="deleteSelected()"><i class="fa-regular fa-trash-can me-1"></i>刪除</button>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <table id="adminTable" class="table table-hover align-middle w-100">
+        <thead class="table-light">
+          <tr>
+            <th width="30"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+            <th>梯次</th>
+            <th>科別</th>
+            <th>基本資料</th> 
+            <th>聯絡資訊</th>
+            <th>狀態</th>
+            <th>回覆</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="modalTitle">新增委員</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <form id="addForm">
+      <input type="hidden" name="uid" id="editUid">
+      
+      <div class="row g-2">
+        <div class="col-md-4 mb-3"><label>姓名</label><input type="text" class="form-control" name="name" id="editName" required></div>
+        <div class="col-md-4 mb-3"><label>梯次</label><select class="form-select" name="batch" id="editBatch"><option value="1">第1梯</option><option value="2">第2梯</option><option value="3">第3梯</option><option value="4">第4梯</option><option value="5">第5梯</option></select></div>
+        <div class="col-md-4 mb-3"><label>科別</label><select class="form-select" name="subject" id="editSubject"><option value="一般">一般</option><option value="體育">體育</option><option value="音樂">音樂</option><option value="美術">美術</option><option value="特教">特教</option><option value="輔導">輔導</option></select></div>
+      </div>
+      
+      <div class="row g-2">
+        <div class="col-md-6 mb-3"><label>單位 (選填)</label><input type="text" class="form-control" name="unit" id="editUnit"></div>
+        <div class="col-md-6 mb-3"><label>職稱 (選填)</label><input type="text" class="form-control" name="title" id="editTitle"></div>
+      </div>      
+      <div class="mb-3"><label>飲食習慣</label><select class="form-select" name="diet" id="editDiet"><option value="">(未填寫)</option><option value="葷">葷</option><option value="素">素</option><option value="其他">其他</option></select></div>
+      <div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" id="editEmail" required></div>
+      <div class="mb-3"><label>電話</label><input type="text" class="form-control" name="phone" id="editPhone" placeholder="0912345678"></div>
+      <hr class="my-3"><h6 class="text-primary fw-bold">意願設定 (僅編輯時使用)</h6>
+      <div class="row">
+        <div class="col-md-6 mb-3"><label>意願狀態</label><select class="form-select" name="willingness" id="editWillingness"><option value="">(尚未回覆)</option><option value="yes">同意</option><option value="no">婉拒</option></select></div>
+        <div class="col-md-12 mb-3"><label>備註 / 婉拒原因</label><textarea class="form-control" name="note" id="editNote" rows="2"></textarea></div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" onclick="saveCandidate()">儲存</button></div></div></div></div>
+
+  <div class="modal fade" id="importModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">匯入資料</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <ul class="nav nav-tabs mb-3" id="importTab" role="tablist">
+      <li class="nav-item"><button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-pane">複製貼上</button></li>
+      <li class="nav-item"><button class="nav-link" id="csv-tab" data-bs-toggle="tab" data-bs-target="#csv-pane">上傳 CSV 檔</button></li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="text-pane">
+        <div class="row g-2 mb-2">
+            <div class="col-6"><label>設定梯次</label><select class="form-select" id="importBatch"><option value="1">第1梯</option><option value="2">第2梯</option><option value="3">第3梯</option><option value="4">第4梯</option><option value="5">第5梯</option></select></div>
+            <div class="col-6"><label>設定科別</label><select class="form-select" id="importSubject"><option value="一般">一般</option><option value="體育">體育</option><option value="音樂">音樂</option><option value="美術">美術</option><option value="特教">特教</option><option value="輔導">輔導</option></select></div>
+        </div>
+        <textarea class="form-control" id="importText" rows="5" placeholder="姓名, Email, 電話, 單位, 職稱"></textarea>
+        <div class="form-text">每行一筆，使用逗號或 Tab 分隔。<br>例如：王小明, wang@test.com, 0912333444, 社口國小, 教師</div>
+        <button class="btn btn-primary mt-2 w-100" onclick="batchImportText()">執行文字匯入</button>
+      </div>
+
+      <div class="tab-pane fade" id="csv-pane">
+        <div class="mb-3">
+          <label class="form-label">選擇 CSV 檔案 (UTF-8)</label>
+          <input class="form-control" type="file" id="csvFile" accept=".csv">
+          <div class="alert alert-light border mt-2 small">
+            <strong>CSV 欄位順序 (7欄)：</strong><br>姓名, 梯次, 科別, Email, 電話, 單位, 職稱
+          </div>
+        </div>
+        <button class="btn btn-success w-100" onclick="batchImportCSV()">執行 CSV 匯入</button>
+      </div>
+    </div>
+  </div></div></div></div>
+
+  <div class="modal fade" id="smsModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">發送簡訊 (互動資通)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="accordion mb-3" id="smsSettingAccordion">
+        <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSettings"><i class="fa-solid fa-gear me-2"></i>API 帳號設定</button></h2>
+          <div id="collapseSettings" class="accordion-collapse collapse" data-bs-parent="#smsSettingAccordion"><div class="accordion-body bg-light">
+            <div class="mb-2"><label>帳號</label><input type="text" class="form-control form-control-sm" id="smsAccount"></div>
+            <div class="mb-2"><label>密碼</label><input type="password" class="form-control form-control-sm" id="smsPassword"></div>
+            <button class="btn btn-sm btn-outline-primary w-100" onclick="saveSmsSettings()">儲存設定</button>
+          </div></div>
+        </div>
+      </div>
+      <div class="mb-3"><label>內容模板</label><textarea class="form-control" id="smsTemplate" rows="4"></textarea><div class="form-text text-muted">系統會自動轉換短網址。</div></div>
+      <div id="smsPreview" class="border p-2 bg-light d-none" style="max-height: 150px; overflow-y:auto; font-size: 0.9rem;"></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-info text-white" onclick="sendSMS()"><i class="fa-regular fa-paper-plane me-1"></i>開始發送</button></div>
+  </div></div></div>
+
+  <div class="modal fade" id="templateModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title fw-bold">編輯通知範本</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <ul class="nav nav-tabs mb-3"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tpl-email-pane">邀請信</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tpl-sms-pane">簡訊 (純文字)</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tpl-confirm-pane">確認信</button></li></ul>
+      <form id="templateForm"><div class="tab-content">
+          <div class="tab-pane fade show active" id="tpl-email-pane">
+            <div class="alert alert-info py-2 small"><i class="fa-solid fa-circle-info me-1"></i> 變數請使用：<code>{{name}}</code> (姓名)、<code>{{link}}</code> (連結)、<code>{{title}}</code> (職稱)</div>
+            <textarea class="form-control" id="tpl_email_invite" name="tpl_email_invite"></textarea>
+          </div>
+          <div class="tab-pane fade" id="tpl-sms-pane">
+            <div class="alert alert-warning py-2 small">簡訊不支援 HTML。變數：<code>{{姓名}}</code>, <code>{{連結}}</code>, <code>{{職稱}}</code></div>
+            <textarea class="form-control" id="tpl_sms" name="tpl_sms" rows="5"></textarea>
+          </div>
+          <div class="tab-pane fade" id="tpl-confirm-pane">
+            <h6 class="fw-bold mt-2">同意 (Yes)</h6>
+            <div class="form-text mb-1">變數：<code>{{name}}</code>, <code>{{diet}}</code>, <code>{{memo}}</code>, <code>{{title}}</code></div>
+            <textarea class="form-control mb-4" id="tpl_confirm_yes" name="tpl_confirm_yes"></textarea>
+            <h6 class="fw-bold">婉拒 (No)</h6>
+            <div class="form-text mb-1">變數：<code>{{name}}</code></div>
+            <textarea class="form-control" id="tpl_confirm_no" name="tpl_confirm_no"></textarea>
+          </div>
+      </div></form>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" onclick="saveTemplates()">儲存設定</button></div>
+  </div></div></div>
+
+  <div class="modal fade" id="detailModal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content">
+    <div class="modal-header bg-light"><h5 class="modal-title fw-bold" id="detailModalTitle">詳細數據</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body p-0"><ul class="list-group list-group-flush" id="detailList"></ul></div>
+    <div class="modal-footer p-2 justify-content-center bg-light"><button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">關閉</button></div>
+  </div></div></div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/lang/summernote-zh-TW.min.js"></script>
+
+<script>
+  // ==========================================
+  // ★★★ 重要：請替換成您的 Google 網頁應用程式部署 URL ★★★
+  // ==========================================
+  const API_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec"; 
+
+  function getBatchBadge(batch) {
+    const b = parseInt(batch) || 1; 
+    let colorClass = "bg-secondary"; 
+    switch (b) {
+      case 1: colorClass = "bg-primary"; break;
+      case 2: colorClass = "bg-success"; break;
+      case 3: colorClass = "bg-info text-dark"; break;
+      case 4: colorClass = "bg-warning text-dark"; break;
+      case 5: colorClass = "bg-danger"; break;
+      case 6: colorClass = "bg-dark"; break;
+      default: colorClass = "bg-secondary"; break;
+    }
+    return `<span class="badge ${colorClass} rounded-pill">第${b}梯</span>`;
+  }
+
+  let dataTable;
+  let globalData = null;
+
+  $(document).ready(function() {
+    loadData();
+    
+    setTimeout(function() {
+      if ($('#loading-overlay').is(':visible')) {
+        $('#loading-overlay').fadeOut();
+        console.warn("系統讀取逾時，已強制關閉遮罩。");
+      }
+    }, 15000);
+
+    $('#selectAll').on('click', function(){ $('.row-check').prop('checked', this.checked); });
+    document.getElementById('addModal').addEventListener('hidden.bs.modal', function(){ $('#addForm')[0].reset(); $('#editUid').val(''); $('#modalTitle').text('新增委員'); $('#editBatch').val('1'); });
+
+    $('#filterBatch').on('change', function(){ if(dataTable) dataTable.column(1).search(this.value).draw(); });
+    $('#filterSubject').on('change', function(){ if(dataTable) dataTable.column(2).search(this.value).draw(); });
+
+    $('#tpl_email_invite, #tpl_confirm_yes, #tpl_confirm_no').summernote({
+      height: 250, lang: 'zh-TW',
+      toolbar: [
+        ['style', ['style']], ['font', ['bold', 'underline', 'clear', 'color']],
+        ['para', ['ul', 'ol', 'paragraph']], ['insert', ['link', 'hr']], ['view', ['fullscreen', 'codeview', 'help']]
+      ],
+      placeholder: '請輸入信件內容...'
+    });
+  });
+
+  function reloadData() {
+    $('#filterBatch').val('');
+    $('#filterSubject').val('');
+    $('#loading-overlay').fadeIn(100);
+    loadData();
+  }
+
+  // 1. 讀取資料 (改為 fetch GET)
+  function loadData() {
+    const timestamp = new Date().getTime();
+    fetch(`${API_URL}?action=getAdminData&t=${timestamp}`)
+      .then(response => response.json())
+      .then(data => {
+        // 確保相容 { status: 'success', data: ... } 或直接回傳資料的格式
+        const resultData = data.data ? data.data : data; 
+        renderDashboard(resultData);
+      })
+      .catch(err => {
+        $('#loading-overlay').fadeOut();
+        alert("讀取失敗 (Error): " + err);
+      });
+  }
+
+  function escapeParam(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, " ").replace(/\r/g, "");
+  }
+
+  function renderDashboard(data) {
+    globalData = data;
+    try {
+      if (data.smsTemplate) $('#smsTemplate').val(data.smsTemplate);
+
+      $('#stat-total').text(data.stats.total);
+      $('#stat-read').text(data.stats.read);
+      $('#stat-agree').text(data.stats.agree);
+      $('#stat-reject').text(data.stats.reject);
+
+      let dietMeat = 0, dietVeg = 0;
+      if (data.list) {
+        data.list.forEach(r => { 
+          if (r.willingness === 'yes') { 
+            if (r.diet === '葷') dietMeat++; 
+            if (r.diet === '素') dietVeg++; 
+          } 
+        });
+      }
+      $('#stat-diet').html(`葷:<span class="text-primary">${dietMeat}</span> / 素:<span class="text-success">${dietVeg}</span>`);
+
+      if ($.fn.DataTable.isDataTable('#adminTable')) $('#adminTable').DataTable().destroy();
+      const tbody = $('#table-body'); tbody.empty(); 
+      
+      data.list.forEach(row => {
+        let emailStatus = `<span class="badge bg-secondary">未發送</span>`;
+        if (row.status === "已發送" || row.status === "已回覆") {
+           if (row.readTime) emailStatus = `<span class="badge bg-warning text-dark"><i class="fa-regular fa-eye me-1"></i>信件已讀</span><br><small class="text-muted" style="font-size:0.7rem">${row.readTime}</small>`;
+           else emailStatus = `<span class="badge bg-primary">信件已寄</span>`;
+        }
+        
+        let smsBadge = "";
+        if (row.smsStatus) smsBadge = `<div class="mt-1"><span class="badge bg-info text-dark" title="${row.smsStatus}"><i class="fa-solid fa-comment-sms me-1"></i>簡訊已寄</span></div>`;
+        const finalStatus = `<div>${emailStatus}${smsBadge}</div>`;
+
+        let badgeHtml = `<span class="text-muted">-</span>`;
+        if (row.willingness === "yes") badgeHtml = `<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>同意</span>`;
+        else if (row.willingness === "no") badgeHtml = `<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>婉拒</span>`;
+
+        let noteIconHtml = "";
+        if (row.note && String(row.note).trim() !== "") {
+          const safeNote = String(row.note).replace(/"/g, '&quot;');
+          noteIconHtml = `<a tabindex="0" class="ms-2 text-danger text-decoration-none" role="button" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="${safeNote}"><i class="fa-solid fa-circle-exclamation fs-5 align-middle"></i></a>`;
+        }
+        const replyStatus = `<div class="d-flex align-items-center"><div>${badgeHtml}${row.replyTime ? `<br><small class="text-muted" style="font-size:0.75rem">${row.replyTime}</small>` : ''}</div>${noteIconHtml}</div>`;
+
+        let dietBadge = "";
+        if (row.diet) {
+            let color = "bg-secondary";
+            if (row.diet === "素") color = "bg-success";
+            else if (row.diet === "葷") color = "bg-info text-dark";
+            dietBadge = `<span class="badge ${color} ms-2" style="font-size:0.7rem">${row.diet}</span>`;
+        }
+        
+        const infoHtml = `<div class="fw-bold">${row.name} ${dietBadge}</div><small class="text-muted">${row.unit||''} ${row.title?'/ '+row.title:''}</small>`;
+        const btnHtml = `<button class="btn btn-sm btn-outline-secondary" onclick="editUser('${row.uid}','${escapeParam(row.name)}','${escapeParam(row.subject)}','${escapeParam(row.email)}','${escapeParam(row.phone)}','${escapeParam(row.unit)}','${escapeParam(row.title)}','${escapeParam(row.diet)}','${row.willingness}','${escapeParam(row.note)}', '${row.batch}')">編輯</button>`;
+        
+        const tr = `<tr id="row-${row.uid}">
+            <td><input type="checkbox" class="form-check-input row-check" value="${row.uid}"></td>
+            <td class="cell-batch">${getBatchBadge(row.batch)}</td>
+            <td class="cell-subject"><span class="badge bg-light text-dark border">${row.subject}</span></td>
+            <td class="cell-info">${infoHtml}</td>
+            <td class="cell-contact"><div class="d-flex flex-column"><span><i class="fa-regular fa-envelope me-2 text-muted"></i>${row.email}</span><span><i class="fa-solid fa-mobile-screen me-2 text-muted"></i>${row.phone||'--'}</span></div></td>
+            <td>${finalStatus}</td><td>${replyStatus}</td><td>${btnHtml}</td></tr>`;
+        tbody.append(tr);
+      });
+
+      dataTable = $('#adminTable').DataTable({
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/zh-HANT.json" },
+        "order": [[ 6, "desc" ], [ 5, "desc" ]],
+        "autoWidth": false,
+        "drawCallback": function() { [...document.querySelectorAll('[data-bs-toggle="popover"]')].map(el => new bootstrap.Popover(el)); },
+        "initComplete": function() { $('#loading-overlay').fadeOut(300); }
+      });
+    } catch (e) {
+      console.error(e); $('#loading-overlay').fadeOut(); alert("Render Error: " + e.message);
+    }
+  }
+
+  function editUser(uid,n,s,e,p,u,t,d,w,note,b) {
+    $('#modalTitle').text('編輯資料');
+    $('#editUid').val(uid);
+    $('#editName').val(n);
+    $('#editSubject').val(s);
+    $('#editEmail').val(e);
+    $('#editPhone').val(p);
+    $('#editUnit').val(u);
+    $('#editTitle').val(t);
+    $('#editDiet').val(d);
+    $('#editWillingness').val(w);
+    $('#editNote').val(note);
+    $('#editBatch').val(b || "1"); 
+    new bootstrap.Modal(document.getElementById('addModal')).show();
+  }
+
+  // 2. 儲存委員 (改為 fetch POST)
+  function saveCandidate() {
+    const f=document.forms['addForm'];
+    const d={
+        uid:f.uid.value, name:f.name.value, subject:f.subject.value, 
+        email:f.email.value, phone:f.phone.value, unit:f.unit.value, 
+        title:f.title.value, diet:f.diet.value, willingness:f.willingness.value, 
+        note:f.note.value, batch:f.batch.value 
+    };
+    $('#loading-overlay').show();
+    const actionName = d.uid ? 'adminEditCandidate' : 'adminAddCandidate';
+
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: actionName, data: d })
+    })
+    .then(res => res.json())
+    .then(result => {
+      $('#addModal').modal('hide'); 
+      $('#loading-overlay').hide(); 
+      if (result.status === 'success' || result.data) {
+         if (d.uid) updateLocalRow(d); 
+         else { alert('新增成功'); reloadData(); }
+      } else { alert('儲存失敗：' + (result.message || '')); }
+    })
+    .catch(error => { $('#loading-overlay').hide(); alert('連線發生錯誤：' + error); });
+  }
+
+  function updateLocalRow(d) {
+    const r=$('#row-'+d.uid);if(r.length===0){reloadData();return;}
+    r.find('.cell-batch').html(getBatchBadge(d.batch));
+    r.find('.cell-subject').html(`<span class="badge bg-light text-dark border">${d.subject}</span>`);
+    
+    let db=""; if(d.diet){let c="bg-secondary";if(d.diet==="素")c="bg-success";else if(d.diet==="葷")c="bg-info text-dark";db=`<span class="badge ${c} ms-2" style="font-size:0.7rem">${d.diet}</span>`;}
+    r.find('.cell-info').html(`<div class="fw-bold">${d.name} ${db}</div><small class="text-muted">${d.unit||''} ${d.title?'/ '+d.title:''}</small>`);
+    r.find('.cell-contact').html(`<div class="d-flex flex-column"><span><i class="fa-regular fa-envelope me-2 text-muted"></i>${d.email}</span><span><i class="fa-solid fa-mobile-screen me-2 text-muted"></i>${d.phone||'--'}</span></div>`);
+    
+    let bh=`<span class="text-muted">-</span>`;
+    if(d.willingness==="yes")bh=`<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>同意</span>`;else if(d.willingness==="no")bh=`<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>婉拒</span>`;
+    let nh="";if(d.note&&d.note.trim()!==""){const safe=d.note.replace(/"/g,'&quot;');nh=`<a tabindex="0" class="ms-2 text-danger text-decoration-none" role="button" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="${safe}"><i class="fa-solid fa-circle-exclamation fs-5 align-middle"></i></a>`;}
+    
+    if(!d.willingness) {
+        r.find('td').eq(5).html(`<div><span class="badge bg-secondary">更新中...</span></div>`);
+        setTimeout(reloadData, 500); 
+    } else {
+        r.find('td').eq(5).html(`<div class="d-flex align-items-center"><div>${bh}<br><small class="text-muted">剛剛更新</small></div>${nh}</div>`);
+    }
+
+    const newPop=r.find('td').eq(5).find('[data-bs-toggle="popover"]'); if(newPop.length)new bootstrap.Popover(newPop[0]);
+    const nb=`editUser('${d.uid}','${escapeParam(d.name)}','${escapeParam(d.subject)}','${escapeParam(d.email)}','${escapeParam(d.phone)}','${escapeParam(d.unit)}','${escapeParam(d.title)}','${escapeParam(d.diet)}','${d.willingness}','${escapeParam(d.note)}', '${d.batch}')`;
+    r.find('button').attr('onclick',nb);
+    r.css('background-color','#fff3cd');setTimeout(()=>r.css('background-color',''),1000);
+  }
+
+  function exportCSV() {
+    if(!globalData||!globalData.list||globalData.list.length===0)return alert("無資料");
+    const currentSubject = $('#filterSubject').val();
+    const currentBatch = $('#filterBatch').val();
+
+    const de = globalData.list.filter(r => {
+      let matchSubject = !currentSubject || r.subject === currentSubject;
+      let matchBatch = !currentBatch || String(r.batch) === currentBatch;
+      return matchSubject && matchBatch;
+    });
+    if(de.length===0)return alert("無資料");
+    
+    let c="\uFEFF梯次,科別,姓名,單位,職稱,飲食,Email,電話,信件狀態,意願,回覆時間,備註\n";
+    de.forEach(r=>{
+      let wt="";if(r.willingness==="yes")wt="同意";else if(r.willingness==="no")wt="婉拒";
+      const sn=(r.note||"").replace(/\n/g," ").replace(/"/g,'""');
+      const ps=r.phone?`="${r.phone}"`:"";
+      const cr=[r.batch, r.subject,r.name,r.unit||"",r.title||"",r.diet||"",r.email,ps,r.status,wt,r.replyTime||"",sn].map(f=>{if(String(f).startsWith('="'))return f;return `"${String(f).replace(/"/g,'""')}"`;}).join(",");
+      c+=cr+"\n";
+    });
+    const b=new Blob([c],{type:'text/csv;charset=utf-8;'});const l=document.createElement("a");l.href=URL.createObjectURL(b);l.download=`教甄委員_${new Date().toISOString().slice(0,10)}.csv`;l.style.visibility='hidden';document.body.appendChild(l);l.click();document.body.removeChild(l);
+  }
+
+  function batchImportText() {
+    const b = $('#importBatch').val(), s = $('#importSubject').val(), t = $('#importText').val(); 
+    if (!t.trim()) return alert("請輸入內容");
+    const l = []; const lines = t.split(/\r\n|\n|\r/);
+    lines.forEach(line => {
+      if (!line.trim()) return; 
+      let p = line.indexOf('\t') !== -1 ? line.split('\t') : line.split(/[,，]/); 
+      if (p[0] && p[0].trim() !== "") {
+        l.push({ name: p[0]?.trim(), email: p[1]?.trim(), phone: p[2]?.trim(), unit: p[3]?.trim(), title: p[4]?.trim(), subject: s, batch: b });
+      }
+    });
+    sendImport(l);
+  }
+
+  function batchImportCSV() {
+    const f = document.getElementById('csvFile').files[0];
+    if (!f) return alert("請選擇檔案");
+    const r = new FileReader(); 
+    r.onload = e => {
+      const l = [];
+      e.target.result.split(/\r\n|\n|\r/).forEach((line, i) => {
+        if (i < 1 || !line.trim()) return; 
+        const p = line.split(',');
+        if (p.length > 1 && p[0].trim() !== "") {
+          l.push({ name: p[0]?.trim(), batch: p[1]?.trim() || "1", subject: p[2]?.trim() || "一般", email: p[3]?.trim(), phone: p[4]?.trim(), unit: p[5]?.trim(), title: p[6]?.trim() });
+        }
+      });
+      sendImport(l);
+    }; 
+    r.readAsText(f, "UTF-8");
+  }
+
+  // 3. 執行匯入 (改為 fetch POST)
+  function sendImport(l) {
+    if (l.length === 0) return alert("沒有解析到有效資料，請檢查格式");
+    $('#loading-overlay').show(); 
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'adminBatchImport', data: l })
+    })
+    .then(res => res.json())
+    .then(r => {
+      if (r.status === 'success') {
+        alert(`成功匯入 ${r.data ? r.data.count : '多'} 筆`);
+        reloadData();
+        $('#importModal').modal('hide');
+      } else { alert('匯入失敗 (後端回傳 error): ' + (r.message||'')); $('#loading-overlay').hide(); }
+    })
+    .catch(e => { console.error(e); $('#loading-overlay').hide(); alert("匯入發生錯誤: " + e); });
+  }
+
+  // 4. 批次操作 (刪除、寄信、簡訊) - 全部改為 fetch
+  function getSelected(){let ids=[];$('.row-check:checked').each(function(){ids.push($(this).val());});return ids;}
+  
+  function deleteSelected(){
+    const ids=getSelected(); if(ids.length===0)return alert('未勾選');
+    if(confirm('確定刪除?')){
+      $('#loading-overlay').show();
+      fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adminDeleteCandidates', data: ids }) })
+      .then(res=>res.json()).then(r=>{ alert('刪除完成'); reloadData(); }).catch(e=>{ alert('發生錯誤'); reloadData(); });
+    }
+  }
+  
+  function resendSelected(){
+    const ids=getSelected(); if(ids.length===0)return alert('未勾選');
+    if(confirm('確定寄出?')){
+      $('#loading-overlay').show();
+      fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adminResendEmails', data: ids }) })
+      .then(res=>res.json()).then(r=>{ alert('已寄出'); reloadData(); }).catch(e=>{ alert('發生錯誤'); reloadData(); });
+    }
+  }
+  
+  function openSMSModal(){
+    if(getSelected().length===0)return alert('未勾選');
+    fetch(`${API_URL}?action=getSmsConfig`).then(res=>res.json()).then(r=>{
+      let config = r.data || r;
+      $('#smsAccount').val(config.account);
+      if(config.hasPassword) $('#smsPassword').attr('placeholder','******** (已儲存)');
+      new bootstrap.Modal(document.getElementById('smsModal')).show();
+    });
+  }
+
+  function saveSmsSettings(){
+    const a=$('#smsAccount').val(),p=$('#smsPassword').val(); if(!a||!p)return alert("請輸入");
+    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSmsConfig', data: { account: a, password: p } }) })
+    .then(res=>res.json()).then(()=>{ alert("儲存成功"); new bootstrap.Collapse(document.getElementById('collapseSettings')).hide(); });
+  }
+
+  function sendSMS(){
+    $('#smsPreview').html('<div class="text-center"><div class="spinner-border spinner-border-sm"></div> 發送中...</div>').removeClass('d-none');
+    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adminSendSMS', data: { ids: getSelected(), template: $('#smsTemplate').val() } }) })
+    .then(res=>res.json()).then(r=>{
+      let resData = r.data || r;
+      if(r.status==='error'){ $('#smsPreview').html(`<div class="text-danger">${r.message}</div>`); }
+      else {
+        let h=`<div class="text-success fw-bold mb-2">成功: ${resData.count}</div><ul>`;
+        if(resData.logs) resData.logs.forEach(l=>h+=`<li>${l.name}: ${l.msg}</li>`);
+        h+='</ul>'; $('#smsPreview').html(h); reloadData();
+      }
+    });
+  }
+  
+  // 5. 範本設定 (改為 fetch)
+  function openTemplateModal(){
+    $('#loading-overlay').show();
+    fetch(`${API_URL}?action=getSettingsData`)
+    .then(res=>res.json()).then(r=>{ 
+      $('#loading-overlay').hide();
+      let s = r.data || r;
+      $('#tpl_email_invite').summernote('code', s['TEMPLATE_EMAIL_INVITE']||'');
+      $('#tpl_confirm_yes').summernote('code', s['TEMPLATE_EMAIL_CONFIRM_YES']||'');
+      $('#tpl_confirm_no').summernote('code', s['TEMPLATE_EMAIL_CONFIRM_NO']||'');
+      $('#tpl_sms').val(s['TEMPLATE_SMS']||''); 
+      new bootstrap.Modal(document.getElementById('templateModal')).show(); 
+    }).catch(e=>{$('#loading-overlay').hide();});
+  }
+  
+  function saveTemplates(){
+    if(!confirm("確定儲存?")) return;
+    const o = {
+      tpl_email_invite: $('#tpl_email_invite').summernote('code'),
+      tpl_confirm_yes: $('#tpl_confirm_yes').summernote('code'),
+      tpl_confirm_no: $('#tpl_confirm_no').summernote('code'),
+      tpl_sms: $('#tpl_sms').val()
+    };
+    $('#loading-overlay').show();
+    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSettingsData', data: o }) })
+    .then(res=>res.json()).then(()=>{
+      alert("已更新"); $('#templateModal').modal('hide'); $('#loading-overlay').hide(); reloadData();
+    });
+  }
+
+  // 顯示詳細數據 (不牽涉 API，維持原樣)
+  function showStatDetails(type) {
+    if(!globalData||!globalData.list)return alert("無資料");
+    let title="", f=[];
+    if(type==='total'){title="徵詢總數";f=globalData.list;}
+    else if(type==='read'){title="信件已讀";f=globalData.list.filter(r=>r.readTime);}
+    else if(type==='agree'){title="同意擔任";f=globalData.list.filter(r=>r.willingness==='yes');}
+    else if(type==='reject'){title="婉拒邀請";f=globalData.list.filter(r=>r.willingness==='no');}
+    else if(type==='diet'){title="飲食統計 (僅同意者)";f=globalData.list.filter(r=>r.willingness==='yes');}
+    
+    let c={};
+    f.forEach(r=>{ let k=type==='diet'?(r.diet||"未填寫"):(r.subject||"未分類"); c[k]=(c[k]||0)+1; });
+    
+    let h=""; const sk=Object.keys(c).sort((a,b)=>c[b]-c[a]);
+    if(sk.length===0) h='<li class="list-group-item text-center p-3">無資料</li>';
+    else {
+      sk.forEach(k=>{
+        let bc="bg-secondary";
+        if(type==='total')bc="bg-primary"; if(type==='read')bc="bg-warning text-dark"; if(type==='agree')bc="bg-success"; if(type==='reject')bc="bg-danger";
+        if(type==='diet'){if(k==='葷')bc="bg-info text-dark";if(k==='素')bc="bg-success";}
+        h+=`<li class="list-group-item d-flex justify-content-between align-items-center">${k}<span class="badge ${bc} rounded-pill">${c[k]}</span></li>`;
+      });
+      h+=`<li class="list-group-item d-flex justify-content-between align-items-center bg-light fw-bold">總計<span class="badge bg-dark rounded-pill">${f.length}</span></li>`;
+    }
+    $('#detailModalTitle').text(title); $('#detailList').html(h); new bootstrap.Modal(document.getElementById('detailModal')).show();
+  }
+</script>
+</body>
+</html>

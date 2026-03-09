@@ -493,6 +493,7 @@ function submitForm(f) {
   try {
     const name = data[targetRowIndex][1];
     const email = data[targetRowIndex][3];
+    const title = data[targetRowIndex][13] || "";
     if (email && email.includes("@")) {
       const subject = "【教甄委員會】已收到您的意願回覆 - 確認通知";
       let body = "";

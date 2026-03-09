@@ -2,6 +2,7 @@
 
 // ★★★ 請替換為您的 Web App 網址 (部署後取得) ★★★
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec";
+const FRONTEND_URL = "https://kelvintung1018.github.io/skes/index.html";
 const SHEET_NAME = "Candidates";
 const SETTINGS_SHEET_NAME = "Settings";
 
@@ -337,7 +338,7 @@ function adminResendEmails(ids) {
         const name = data[i][1];
         const email = data[i][3];
         const title = data[i][13];
-        const longLink = WEB_APP_URL + "?uid=" + uuid;
+        const longLink = FRONTEND_URL + "?uid=" + uuid;
         const shortLink = getShortUrl(longLink); 
 
         let body = templateStr
@@ -388,7 +389,7 @@ function adminSendSMS(ids, template) {
 
     // 格式化電話號碼 (移除空白與橫線)
     const phone = String(phoneRaw).replace(/[-\s]/g, "");
-    const longLink = WEB_APP_URL + "?uid=" + data[i][0];
+    const longLink = FRONTEND_URL + "?uid=" + data[i][0];
     const link = getShortUrl(longLink);
 
     // 替換簡訊內容變數

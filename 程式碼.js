@@ -346,7 +346,8 @@ function adminResendEmails(ids) {
           .replace(/{{link}}/g, shortLink)
           .replace(/{{title}}/g, title)
           .replace(/<\?= name \?>/g, name)
-          .replace(/<\?= link \?>/g, shortLink);
+          .replace(/<\?= link \?>/g, shortLink)
+          .replace(/<\?= title \?>/g, title);
 
         const tLink = WEB_APP_URL + "?track=true&uid=" + uuid;
         const img = `<img src="${tLink}" width="1" height="1" style="display:none;"/>`;
@@ -498,11 +499,11 @@ function submitForm(f) {
       if (f.willingness === "yes") {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_YES');
         if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>願意擔任</strong>的回覆。<br>飲食：{{diet}}<br>備註：{{memo}}</p>";
-        body = tpl.replace(/{{name}}/g, name).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
+        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
       } else {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_NO');
         if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>無法擔任</strong>的回覆。感謝您的支持。</p>";
-        body = tpl.replace(/{{name}}/g, name);
+        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title);
       }
       GmailApp.sendEmail(email, subject, "", { htmlBody: body, name: "教甄委員會" });
     }

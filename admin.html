@@ -540,31 +540,61 @@
     .catch(error => { $('#loading-overlay').hide(); alert('連線發生錯誤：' + error); });
   }
 
-  function updateLocalRow(d) {
-    const r=$('#row-'+d.uid);if(r.length===0){reloadData();return;}
+ function updateLocalRow(d) {
+    const r = $('#row-' + d.uid);
+    if (r.length === 0) { reloadData(); return; }
+    
+    // 1. 更新梯次與科別
     r.find('.cell-batch').html(getBatchBadge(d.batch));
     r.find('.cell-subject').html(`<span class="badge bg-light text-dark border">${d.subject}</span>`);
     
-    let db=""; if(d.diet){let c="bg-secondary";if(d.diet==="素")c="bg-success";else if(d.diet==="葷")c="bg-info text-dark";db=`<span class="badge ${c} ms-2" style="font-size:0.7rem">${d.diet}</span>`;}
+    // 2. 更新飲食與基本資料
+    let db = ""; 
+    if (d.diet) {
+        let c = "bg-secondary";
+        if (d.diet === "素") c = "bg-success";
+        else if (d.diet === "葷") c = "bg-info text-dark";
+        db = `<span class="badge ${c} ms-2" style="font-size:0.7rem">${d.diet}</span>`;
+    }
     r.find('.cell-info').html(`<div class="fw-bold">${d.name} ${db}</div><small class="text-muted">${d.unit||''} ${d.title?'/ '+d.title:''}</small>`);
+    
+    // 3. 更新聯絡資訊
     r.find('.cell-contact').html(`<div class="d-flex flex-column"><span><i class="fa-regular fa-envelope me-2 text-muted"></i>${d.email}</span><span><i class="fa-solid fa-mobile-screen me-2 text-muted"></i>${d.phone||'--'}</span></div>`);
     
-    let bh=`<span class="text-muted">-</span>`;
-    if(d.willingness==="yes")bh=`<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>同意</span>`;else if(d.willingness==="no")bh=`<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>婉拒</span>`;
-    let nh="";if(d.note&&d.note.trim()!==""){const safe=d.note.replace(/"/g,'&quot;');nh=`<a tabindex="0" class="ms-2 text-danger text-decoration-none" role="button" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="${safe}"><i class="fa-solid fa-circle-exclamation fs-5 align-middle"></i></a>`;}
+    // ==========================================
+    // ★ 4. 修正重點：更新意願狀態與備註 (屬於第 7 欄，即 eq(6))
+    // ==========================================
+    let bh = `<span class="text-muted">-</span>`;
+    if (d.willingness === "yes") bh = `<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>同意</span>`;
+    else if (d.willingness === "no") bh = `<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>婉拒</span>`;
     
-    if(!d.willingness) {
-        r.find('td').eq(5).html(`<div><span class="badge bg-secondary">更新中...</span></div>`);
+    let nh = "";
+    if (d.note && d.note.trim() !== "") {
+        const safe = d.note.replace(/"/g, '&quot;');
+        nh = `<a tabindex="0" class="ms-2 text-danger text-decoration-none" role="button" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="${safe}"><i class="fa-solid fa-circle-exclamation fs-5 align-middle"></i></a>`;
+    }
+    
+    // 將組裝好的 HTML 寫入正確的 eq(6) 格子裡
+    if (!d.willingness) {
+        r.find('td').eq(6).html(`<div><span class="badge bg-secondary">更新中...</span></div>`);
         setTimeout(reloadData, 500); 
     } else {
-        r.find('td').eq(5).html(`<div class="d-flex align-items-center"><div>${bh}<br><small class="text-muted">剛剛更新</small></div>${nh}</div>`);
+        r.find('td').eq(6).html(`<div class="d-flex align-items-center"><div>${bh}<br><small class="text-muted">剛剛更新</small></div>${nh}</div>`);
     }
 
-    const newPop=r.find('td').eq(5).find('[data-bs-toggle="popover"]'); if(newPop.length)new bootstrap.Popover(newPop[0]);
-    const nb=`editUser('${d.uid}','${escapeParam(d.name)}','${escapeParam(d.subject)}','${escapeParam(d.email)}','${escapeParam(d.phone)}','${escapeParam(d.unit)}','${escapeParam(d.title)}','${escapeParam(d.diet)}','${d.willingness}','${escapeParam(d.note)}', '${d.batch}')`;
-    r.find('button').attr('onclick',nb);
-    r.css('background-color','#fff3cd');setTimeout(()=>r.css('background-color',''),1000);
-  }
+    // 重新綁定該格子的 Popover (備註提示框)
+    const newPop = r.find('td').eq(6).find('[data-bs-toggle="popover"]'); 
+    if (newPop.length) new bootstrap.Popover(newPop[0]);
+    
+    // 5. 更新編輯按鈕參數
+    const safeWillingness = d.willingness || '';
+    const nb = `editUser('${d.uid}','${escapeParam(d.name)}','${escapeParam(d.subject)}','${escapeParam(d.email)}','${escapeParam(d.phone)}','${escapeParam(d.unit)}','${escapeParam(d.title)}','${escapeParam(d.diet)}','${safeWillingness}','${escapeParam(d.note)}', '${d.batch}')`;
+    r.find('button').attr('onclick', nb);
+    
+    // 6. 畫面特效
+    r.css('background-color','#fff3cd');
+    setTimeout(() => r.css('background-color',''), 1000);
+}
 
   function exportCSV() {
     if(!globalData||!globalData.list||globalData.list.length===0)return alert("無資料");

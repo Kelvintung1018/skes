@@ -85,39 +85,67 @@
     </div>
 
     <script>
-      // ==========================================
+// ==========================================
       // ★★★ 重要：請替換成您的 Google 網頁應用程式部署 URL ★★★
       // ==========================================
       const API_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec"; 
 
       window.onload = function() {
-        // 從目前的網址中抓取 ?uid= 後面的參數 (純前端寫法)
+        // 從目前的網址中抓取參數
         const urlParams = new URLSearchParams(window.location.search);
         const uid = urlParams.get('uid'); 
+        const shortCode = urlParams.get('s'); // 新增：抓取短代碼參數
         
-        console.log("從網址取得的 UID:", uid);
+        console.log("從網址取得的參數 - UID:", uid, "短代碼:", shortCode);
 
-        if (!uid) {
+        // 狀況 A：網址是短網址模式 (?s=xxx)，需先向後端請求真實 UID
+        if (shortCode) {
+          fetch(`${API_URL}?action=resolveShortCode&s=${shortCode}`)
+            .then(response => response.json())
+            .then(result => {
+              const resData = result.data ? result.data : result;
+              if (result.status === 'success' && resData.uid) {
+                // 成功解析出 UID，開始載入委員資料
+                loadCandidateData(resData.uid);
+              } else {
+                // 解析失敗 (代碼錯誤或過期)
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error-msg').classList.remove('hidden');
+                alert("此連結已失效或錯誤。");
+              }
+            })
+            .catch(err => {
+              document.getElementById('loading').style.display = 'none';
+              alert("系統連線錯誤 (解析短代碼)：" + err);
+            });
+            
+        // 狀況 B：一般情況，網址本身就帶有 uid (?uid=xxx)
+        } else if (uid) {
+          loadCandidateData(uid);
+          
+        // 狀況 C：什麼參數都沒有
+        } else {
           document.getElementById('loading').style.display = 'none';
           document.getElementById('error-msg').classList.remove('hidden');
-          return;
         }
+      };
 
-        document.getElementById('input-uid').value = uid;
+      // 獨立出一個專門載入委員資料的函式
+      function loadCandidateData(targetUid) {
+        document.getElementById('input-uid').value = targetUid;
 
-        // 呼叫後端查詢資料 (改用 fetch GET)
-        fetch(`${API_URL}?action=getCandidateInfo&uid=${uid}`)
+        // 呼叫後端查詢資料
+        fetch(`${API_URL}?action=getCandidateInfo&uid=${targetUid}`)
           .then(response => response.json())
           .then(result => {
-             // 相容 { status: 'success', data: ... } 結構或直接回傳的資料
              const data = result.data ? result.data : result;
              showForm(data);
           })
           .catch(err => {
              document.getElementById('loading').style.display = 'none';
-             alert("系統連線錯誤：" + err);
+             alert("系統連線錯誤 (讀取資料)：" + err);
           });
-      };
+      }
 
       function showForm(data) {
         document.getElementById('loading').style.display = 'none';

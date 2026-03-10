@@ -2,7 +2,7 @@
 
 // ★★★ 請替換為您的 Web App 網址 (部署後取得) ★★★
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec";
-const FRONTEND_URL = "https://skestc.github.io/115exam/index.html";
+const FRONTEND_URL = "https://skestc.github.io/115exam";
 const SHEET_NAME = "Candidates";
 const SETTINGS_SHEET_NAME = "Settings";
 
@@ -15,12 +15,34 @@ function doGet(e) {
   // 建立參數的簡寫
   const p = e.parameter;
 
-  // ★ 加入您提供的信件已讀追蹤 (Tracking Pixel) 程式碼
+  // ★ 1. 攔截短網址轉址請求 (?s=短代碼)
+  if (p.s) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("UrlShortener");
+    if (sheet) {
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === p.s) {
+          const longUrl = data[i][1];
+          // 記錄點擊次數 (+1)
+          const currentClicks = Number(data[i][3]) || 0;
+          sheet.getRange(i + 1, 4).setValue(currentClicks + 1);
+          
+          // 回傳轉址畫面 (使用 HTML Meta 轉址及 JS 雙重保險)
+          const html = `<html><head><meta http-equiv="refresh" content="0; URL='${longUrl}'" /></head><body style="font-family: sans-serif; text-align: center; padding-top: 50px;">正在為您導向回覆頁面，請稍候...<script>window.location.href="${longUrl}";</script></body></html>`;
+          return HtmlService.createHtmlOutput(html);
+        }
+      }
+    }
+    return ContentService.createTextOutput("找不到此短網址，可能已被移除或失效。");
+  }
+
+  // ★ 2. 攔截信件已讀追蹤 (Tracking Pixel)
   if (p.track && p.uid) {
     recordEmailOpen(p.uid);
     const d = Utilities.base64Decode("R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==");
     return ContentService.createTextOutput("").append(d).setMimeType(ContentService.MimeType.PNG);
   }
+
 
   // 以下為原有的 API 路由處理
   var action = p.action;
@@ -33,6 +55,8 @@ function doGet(e) {
       data = getSettingsData();
     } else if (action === 'getCandidateInfo') {
       data = getCandidateInfo(p.uid);
+    } else if (action === 'resolveShortCode') {
+      data = resolveShortCode(p.s);
     } else if (action === 'getSmsConfig') {
       data = getSmsConfig();
     } else {
@@ -374,7 +398,8 @@ function adminResendEmails(ids) {
         const email = data[i][3];
         const title = data[i][13];
         const longLink = FRONTEND_URL + "?uid=" + uuid;
-        const shortLink = getShortUrl(longLink); 
+        //const shortLink = getShortUrl(longLink); 
+        const shortLink = createShortUrl(longLink); // 改用自建的縮網址
 
         let body = templateStr
           .replace(/{{name}}/g, name)
@@ -426,12 +451,13 @@ function adminSendSMS(ids, template) {
     // 格式化電話號碼 (移除空白與橫線)
     const phone = String(phoneRaw).replace(/[-\s]/g, "");
     const longLink = FRONTEND_URL + "?uid=" + data[i][0];
-    const link = getShortUrl(longLink);
-
+    //const link = getShortUrl(longLink);
+    const link = createShortUrl(longLink); // 改用自建的縮網址
+    const smsLink = link.replace(/^https?:\/\//i, '');
     // 替換簡訊內容變數
     const msgContent = template
       .replace(/{{姓名}}/g, name)
-      .replace(/{{連結}}/g, link)
+      .replace(/{{連結}}/g, smsLink)
       .replace(/{{職稱}}/g, title);
       
     // 準備傳送給 API 的參數 (不用 JSON.stringify，維持物件即可，GAS 會自動轉成 Form Data)
@@ -704,4 +730,56 @@ function verifyLogin(username, password) {
   }
   
   return { status: 'error', message: '帳號或密碼錯誤！' };
+}
+
+// ==========================================
+// 9. 系統自建縮網址功能
+// ==========================================
+function createShortUrl(longUrl) {
+  // 1. 產生 6 碼隨機英數短代碼
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let shortCode = '';
+  for (let i = 0; i < 6; i++) {
+    shortCode += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  // 2. 取得或建立 UrlShortener 分頁
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("UrlShortener");
+  if (!sheet) {
+    sheet = ss.insertSheet("UrlShortener");
+    sheet.appendRow(["短代碼", "原始網址", "建立時間", "點擊次數"]);
+    sheet.setFrozenRows(1);
+  }
+
+  // 3. 將資料寫入試算表
+  sheet.appendRow([shortCode, longUrl, new Date(), 0]);
+
+  // 4. 回傳帶有短代碼的 Web App 網址
+  return FRONTEND_URL + "?s=" + shortCode;
+}
+
+// 負責將短代碼解析回真實的 UID
+function resolveShortCode(shortCode) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("UrlShortener");
+  if (!sheet) throw new Error("找不到 UrlShortener 分頁");
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === shortCode) {
+      // 找到對應的長網址 (例如：https://skestc.github.io/115exam?uid=1234-5678-...)
+      const longUrl = data[i][1];
+      
+      // 順便記錄點擊次數 (+1)
+      const currentClicks = Number(data[i][3]) || 0;
+      sheet.getRange(i + 1, 4).setValue(currentClicks + 1);
+      
+      // 從長網址中切出 uid 回傳給前端
+      const uidMatch = longUrl.match(/uid=([^&]+)/);
+      if (uidMatch) {
+        return { uid: uidMatch[1] };
+      }
+    }
+  }
+  throw new Error("無效或已過期的短代碼");
 }

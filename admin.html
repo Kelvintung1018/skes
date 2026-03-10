@@ -635,7 +635,23 @@ function reloadData() {
     r.css('background-color','#fff3cd');
     setTimeout(() => r.css('background-color',''), 1000);
 }
-
+// ==========================================
+// 取得表格中已被勾選的委員 UID
+// ==========================================
+function getSelectedIds() {
+  const ids = [];
+  // 尋找表格內所有被打勾的 checkbox
+  // (這裡排除掉 id 可能是 'selectAll' 的全選框)
+  const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]:checked');
+  
+  checkboxes.forEach(cb => {
+    if (cb.value && cb.value !== "on" && cb.value !== "all") {
+      ids.push(cb.value);
+    }
+  });
+  
+  return ids;
+}
 // ==========================================
 // 匯出 EVERY8D 簡訊批次檔 (CSV)
 // ==========================================

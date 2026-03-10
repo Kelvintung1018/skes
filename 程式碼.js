@@ -10,43 +10,24 @@ const SETTINGS_SHEET_NAME = "Settings";
 // 1. API 路由設定 (doGet / doPost)
 // ==========================================
 
-// 處理 GET 請求 (前端讀取資料 & 信件追蹤)
+// ==========================================
+// 處理 GET 請求 (前端讀取資料、信件追蹤、短代碼解析 API)
+// ==========================================
 function doGet(e) {
-  // 建立參數的簡寫
   const p = e.parameter;
 
-  // ★ 1. 攔截短網址轉址請求 (?s=短代碼)
-  if (p.s) {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("UrlShortener");
-    if (sheet) {
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === p.s) {
-          const longUrl = data[i][1];
-          // 記錄點擊次數 (+1)
-          const currentClicks = Number(data[i][3]) || 0;
-          sheet.getRange(i + 1, 4).setValue(currentClicks + 1);
-          
-          // 回傳轉址畫面 (使用 HTML Meta 轉址及 JS 雙重保險)
-          const html = `<html><head><meta http-equiv="refresh" content="0; URL='${longUrl}'" /></head><body style="font-family: sans-serif; text-align: center; padding-top: 50px;">正在為您導向回覆頁面，請稍候...<script>window.location.href="${longUrl}";</script></body></html>`;
-          return HtmlService.createHtmlOutput(html);
-        }
-      }
-    }
-    return ContentService.createTextOutput("找不到此短網址，可能已被移除或失效。");
-  }
-
-  // ★ 2. 攔截信件已讀追蹤 (Tracking Pixel)
+  // 1. 攔截信件已讀追蹤 (Tracking Pixel)
   if (p.track && p.uid) {
-    recordEmailOpen(p.uid);
+    try {
+      recordEmailOpen(p.uid);
+    } catch(err) {}
     const d = Utilities.base64Decode("R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==");
     return ContentService.createTextOutput("").append(d).setMimeType(ContentService.MimeType.PNG);
   }
 
-
-  // 以下為原有的 API 路由處理
-  var action = p.action;
-  var data;
+  // 2. 處理所有的 API 資料請求
+  const action = p.action;
+  let data;
 
   try {
     if (action === 'getAdminData') {
@@ -55,18 +36,22 @@ function doGet(e) {
       data = getSettingsData();
     } else if (action === 'getCandidateInfo') {
       data = getCandidateInfo(p.uid);
-    } else if (action === 'resolveShortCode') {
-      data = resolveShortCode(p.s);
     } else if (action === 'getSmsConfig') {
       data = getSmsConfig();
+    } else if (action === 'resolveShortCode') {
+      // 處理前端丟過來的短代碼解析請求
+      data = resolveShortCode(p.s);
     } else {
-      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 GET 請求' })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 GET 請求' }))
+                           .setMimeType(ContentService.MimeType.JSON);
     }
     
-    // 統一回傳格式
+    // 成功時，統一回傳 JSON 格式
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: data }))
                          .setMimeType(ContentService.MimeType.JSON);
+
   } catch (error) {
+    // 發生錯誤時，回傳錯誤訊息的 JSON
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
@@ -759,18 +744,23 @@ function createShortUrl(longUrl) {
   return FRONTEND_URL + "?s=" + shortCode;
 }
 
-// 負責將短代碼解析回真實的 UID
+// ==========================================
+// 將短代碼解析回真實的 UID
+// ==========================================
 function resolveShortCode(shortCode) {
+  if (!shortCode) throw new Error("缺少短代碼參數");
+  
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("UrlShortener");
   if (!sheet) throw new Error("找不到 UrlShortener 分頁");
   
   const data = sheet.getDataRange().getValues();
+  
+  // 迴圈比對短代碼
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === shortCode) {
-      // 找到對應的長網址 (例如：https://skestc.github.io/115exam?uid=1234-5678-...)
       const longUrl = data[i][1];
       
-      // 順便記錄點擊次數 (+1)
+      // 記錄點擊次數 (+1)
       const currentClicks = Number(data[i][3]) || 0;
       sheet.getRange(i + 1, 4).setValue(currentClicks + 1);
       
@@ -778,8 +768,12 @@ function resolveShortCode(shortCode) {
       const uidMatch = longUrl.match(/uid=([^&]+)/);
       if (uidMatch) {
         return { uid: uidMatch[1] };
+      } else {
+        throw new Error("短網址對應的連結中找不到 UID");
       }
     }
   }
+  
+  // 如果迴圈跑完都沒找到
   throw new Error("無效或已過期的短代碼");
 }

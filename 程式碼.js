@@ -1,13 +1,8 @@
-/* Code.gs - 教甄委員管理系統 (完整整合版 - 包含 Cloudflare 代理防阻擋) */
+/* Code.gs - 教甄委員管理系統 (完整整合版) */
 
 // ★★★ 請替換為您的 Web App 網址 (部署後取得) ★★★
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec";
 const FRONTEND_URL = "https://skestc.github.io/115exam";
-
-// ★★★ 請替換為您在 Cloudflare 建立的 Proxy Worker 網址 ★★★
-// (請確保網址最後面不要有斜線 /)
-const CLOUDFLARE_PROXY_URL = "https://api-fetcher.kelvin-d83.workers.dev"; 
-
 const SHEET_NAME = "Candidates";
 const SETTINGS_SHEET_NAME = "Settings";
 
@@ -15,6 +10,9 @@ const SETTINGS_SHEET_NAME = "Settings";
 // 1. API 路由設定 (doGet / doPost)
 // ==========================================
 
+// ==========================================
+// 處理 GET 請求 (前端讀取資料、信件追蹤、短代碼解析 API)
+// ==========================================
 function doGet(e) {
   const p = e.parameter;
 
@@ -438,17 +436,17 @@ function adminSendSMS(ids, template) {
     // 格式化電話號碼 (移除空白與橫線)
     const phone = String(phoneRaw).replace(/[-\s]/g, "");
     const longLink = FRONTEND_URL + "?uid=" + data[i][0];
+    //const link = getShortUrl(longLink);
     const link = createShortUrl(longLink); // 改用自建的縮網址
     const smsLink = link.replace(/^https?:\/\//i, '');
-    
     // 替換簡訊內容變數
     const msgContent = template
       .replace(/{{姓名}}/g, name)
       .replace(/{{連結}}/g, smsLink)
       .replace(/{{職稱}}/g, title);
       
-    // 準備傳送給 API 的參數
-    const payload = {
+    // 準備傳送給 API 的參數 (不用 JSON.stringify，維持物件即可，GAS 會自動轉成 Form Data)
+const payload = {
       "UID": SMS_USER,
       "PWD": SMS_PASSWORD,
       "SB": "",
@@ -460,18 +458,16 @@ function adminSendSMS(ids, template) {
     
     const options = {
       "method": "post",
+      // 改為規格書要求的 x-www-form-urlencoded (或者可以直接省略，GAS 預設就是這個)
       "contentType": "application/x-www-form-urlencoded", 
       "payload": payload,
       "muteHttpExceptions": true
+      // 刪除所有偽裝的 headers 區塊
     };
     
     try {
-      // 🚀 【修改點】：將原本的 API 網址打包，交給 Cloudflare Proxy 轉發
-      const targetApiUrl = "https://new.e8d.tw/API21/HTTP/sendSMS.ashx";
-      const proxyUrl = CLOUDFLARE_PROXY_URL + "/?target=" + encodeURIComponent(targetApiUrl);
-      
-      // 呼叫 Proxy 網址，而非直接呼叫 EVERY8D
-      const response = UrlFetchApp.fetch(proxyUrl, options);
+      // ★ 修正點：替換為 EVERY8D 官方專用的 API 網域 (api.every8d.com)
+      const response = UrlFetchApp.fetch("https://new.e8d.tw/API21/HTTP/sendSMS.ashx", options);
       const resultText = response.getContentText().trim();
       
       // 解析 EVERY8D 回傳的 CSV 格式 (例如: 100.0,1,1,0,3298...)
@@ -501,13 +497,9 @@ function adminSendSMS(ids, template) {
   return { status: 'success', count: successCount, logs: logs };
 }
 
-// (備用) 外部短網址服務 - 同樣加上 Proxy 防止被擋
 function getShortUrl(l){
   try{
-    const targetApiUrl = "https://is.gd/create.php?format=simple&url=" + encodeURIComponent(l);
-    const proxyUrl = CLOUDFLARE_PROXY_URL + "/?target=" + encodeURIComponent(targetApiUrl);
-    
-    const r = UrlFetchApp.fetch(proxyUrl, {muteHttpExceptions:true});
+    const r=UrlFetchApp.fetch("https://is.gd/create.php?format=simple&url="+encodeURIComponent(l),{muteHttpExceptions:true});
     if(r.getResponseCode()===200&&r.getContentText().indexOf("http")===0) return r.getContentText();
   }catch(e){}
   return l;

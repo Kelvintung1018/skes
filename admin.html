@@ -176,6 +176,9 @@
         <div class="vr"></div> 
         <button class="btn btn-warning" onclick="resendSelected()"><i class="fa-regular fa-envelope me-1"></i>寄信</button>
         <button class="btn btn-info text-white" onclick="openSMSModal()"><i class="fa-regular fa-comment-dots me-1"></i>簡訊</button>
+        <button class="btn btn-outline-success btn-sm me-2" onclick="exportSmsCsv()">
+        <i class="fas fa-file-csv"></i> 簡訊批次檔
+        </button>
         <button class="btn btn-danger" onclick="deleteSelected()"><i class="fa-regular fa-trash-can me-1"></i>刪除</button>
       </div>
     </div>
@@ -837,6 +840,75 @@ function reloadData() {
     }
     $('#detailModalTitle').text(title); $('#detailList').html(h); new bootstrap.Modal(document.getElementById('detailModal')).show();
   }
+
+  // ==========================================
+// 匯出 EVERY8D 簡訊批次檔 (CSV)
+// ==========================================
+function exportSmsCsv() {
+  const selected = getSelectedIds(); // 取得有打勾的委員 ID
+  if (selected.length === 0) {
+    alert("請先勾選要匯出簡訊名單的委員！");
+    return;
+  }
+
+  // EVERY8D 規定的表頭
+  const headers = ["姓名", "手機門號", "電子郵件", "傳送日期", "參數一", "參數二", "參數三", "參數四", "參數五"];
+  
+  // 加上 \uFEFF (BOM) 確保用 Excel 打開時中文不會變成亂碼
+  let csvContent = "\uFEFF" + headers.join(",") + "\n";
+  
+  // 取得目前系統的前端網址 (用來組合專屬連結)
+  const baseUrl = window.location.href.split('?')[0];
+
+  selected.forEach(id => {
+    // 從全域資料中找出該委員的詳細資料
+    const row = globalData.list.find(r => r.uid === id);
+    if (row) {
+      const name = row.name || "";
+      // 過濾手機號碼中的空白或橫線
+      const phone = row.phone ? String(row.phone).replace(/[-\s]/g, "") : "";
+      const email = row.email || "";
+      const date = ""; // 留空表示立即發送，或由 EVERY8D 後台決定
+      
+      // 設定參數 (對應 EVERY8D 簡訊內容的 <#1#>, <#2#>...)
+      const p1 = name;                             // 參數一：姓名
+      const p2 = baseUrl + "?uid=" + row.uid;      // 參數二：專屬回覆長網址
+      const p3 = row.title || "";                  // 參數三：職稱
+      const p4 = row.unit || "";                   // 參數四：單位
+      const p5 = "";                               // 參數五：留空
+
+      // 處理欄位內容，加上雙引號避免內容中含有逗號破壞 CSV 格式
+      const escapeCsv = (str) => `"${String(str).replace(/"/g, '""')}"`;
+
+      const rowData = [
+        escapeCsv(name),
+        escapeCsv(phone),
+        escapeCsv(email),
+        escapeCsv(date),
+        escapeCsv(p1),
+        escapeCsv(p2),
+        escapeCsv(p3),
+        escapeCsv(p4),
+        escapeCsv(p5)
+      ];
+
+      csvContent += rowData.join(",") + "\n";
+    }
+  });
+
+  // 觸發瀏覽器下載檔案
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  
+  // 檔名加上當下時間戳記
+  const timeString = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `簡訊發送清單_${timeString}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 </script>
 </body>
 </html>

@@ -79,6 +79,7 @@ function doPost(e) {
     else if (action === 'saveSettingsData') { responseData = saveSettingsData(payload); }
     else if (action === 'submitForm') { responseData = submitForm(payload); }
     else if (action === 'verifyLogin') { responseData = verifyLogin(payload.username, payload.password); }
+    else if (action === 'adminExportSmsCsv') { responseData = adminExportSmsCsv(payload.ids); }
     else {
       return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 POST 請求' })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -90,6 +91,60 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ==========================================
+// 匯出 EVERY8D 簡訊批次檔 (由後端產生縮網址)
+// ==========================================
+function adminExportSmsCsv(ids) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  
+  // EVERY8D 規定的表頭
+  const headers = ["姓名", "手機門號", "電子郵件", "傳送日期", "參數一", "參數二", "參數三", "參數四", "參數五"];
+  let csvContent = "\uFEFF" + headers.join(",") + "\n"; // 加入 BOM 確保中文不亂碼
+  
+  for (let i = 1; i < data.length; i++) {
+    if (!ids.includes(data[i][0])) continue;
+    
+    const row = data[i];
+    const name = row[1] || "";
+    const phoneRaw = row[11];
+    const phone = phoneRaw ? String(phoneRaw).replace(/[-\s]/g, "") : "";
+    const email = row[3] || "";
+    const title = row[13] || "";
+    const date = ""; // 留空表示即時發送
+    
+    // ★ 呼叫自建縮網址功能，並寫入資料庫
+    const longLink = FRONTEND_URL + "?uid=" + row[0];
+    const shortLink = createShortUrl(longLink); 
+    
+    // 依序填入參數 (%field1%, %field2%, %field3%)
+    const p1 = name;
+    const p2 = title;
+    const p3 = shortLink;
+    const p4 = "";
+    const p5 = "";
+
+    const escapeCsv = (str) => `"${String(str).replace(/"/g, '""')}"`;
+
+    const rowData = [
+      escapeCsv(name),
+      escapeCsv(phone),
+      escapeCsv(email),
+      escapeCsv(date),
+      escapeCsv(p1),
+      escapeCsv(p2),
+      escapeCsv(p3),
+      escapeCsv(p4),
+      escapeCsv(p5)
+    ];
+
+    csvContent += rowData.join(",") + "\n";
+  }
+  
+  // 將產生的 CSV 內容回傳給前端
+  return { status: 'success', csvContent: csvContent };
 }
 
 // ==========================================

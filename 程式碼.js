@@ -79,7 +79,7 @@ function doPost(e) {
     else if (action === 'saveSettingsData') { responseData = saveSettingsData(payload); }
     else if (action === 'submitForm') { responseData = submitForm(payload); }
     else if (action === 'verifyLogin') { responseData = verifyLogin(payload.username, payload.password); }
-    else if (action === 'adminExportSmsCsv') { responseData = adminExportSmsCsv(payload.ids); }
+    else if (action === 'adminExportSmsData') { responseData = adminExportSmsData(payload.ids); }
     else {
       return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '無效的 POST 請求' })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -94,19 +94,19 @@ function doPost(e) {
 }
 
 // ==========================================
-// 匯出 EVERY8D 簡訊批次檔 (由後端產生縮網址)
+// 匯出 EVERY8D 簡訊批次檔 (準備 Excel 陣列資料)
 // ==========================================
-function adminExportSmsCsv(ids) {
+function adminExportSmsData(ids) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
-  
-  // EVERY8D 規定的表頭
+
+  // 建立表頭 (第一列)
   const headers = ["姓名", "手機門號", "電子郵件", "傳送日期", "參數一", "參數二", "參數三", "參數四", "參數五"];
-  let csvContent = "\uFEFF" + headers.join(",") + "\n"; // 加入 BOM 確保中文不亂碼
-  
+  let exportData = [headers]; // 將表頭放入陣列第一列
+
   for (let i = 1; i < data.length; i++) {
     if (!ids.includes(data[i][0])) continue;
-    
+
     const row = data[i];
     const name = row[1] || "";
     const phoneRaw = row[11];
@@ -114,11 +114,11 @@ function adminExportSmsCsv(ids) {
     const email = row[3] || "";
     const title = row[13] || "";
     const date = ""; // 留空表示即時發送
-    
-    // ★ 呼叫自建縮網址功能，並寫入資料庫
+
+    // 產生自建短網址
     const longLink = FRONTEND_URL + "?uid=" + row[0];
     const shortLink = createShortUrl(longLink); 
-    
+
     // 依序填入參數 (%field1%, %field2%, %field3%)
     const p1 = name;
     const p2 = title;
@@ -126,25 +126,12 @@ function adminExportSmsCsv(ids) {
     const p4 = "";
     const p5 = "";
 
-    const escapeCsv = (str) => `"${String(str).replace(/"/g, '""')}"`;
-
-    const rowData = [
-      escapeCsv(name),
-      escapeCsv(phone),
-      escapeCsv(email),
-      escapeCsv(date),
-      escapeCsv(p1),
-      escapeCsv(p2),
-      escapeCsv(p3),
-      escapeCsv(p4),
-      escapeCsv(p5)
-    ];
-
-    csvContent += rowData.join(",") + "\n";
+    // 將該名委員的資料打包成一列，加入大陣列中
+    exportData.push([name, phone, email, date, p1, p2, p3, p4, p5]);
   }
-  
-  // 將產生的 CSV 內容回傳給前端
-  return { status: 'success', csvContent: csvContent };
+
+  // 將乾淨的陣列資料回傳給前端
+  return { status: 'success', excelData: exportData };
 }
 
 // ==========================================

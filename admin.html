@@ -12,6 +12,7 @@
   <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
   
+  
   <style>
     body { background-color: #f0f2f5; font-family: 'Inter', sans-serif; padding-bottom: 40px;}
     .admin-header { background: white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;}
@@ -176,7 +177,7 @@
         <div class="vr"></div> 
         <button class="btn btn-warning" onclick="resendSelected()"><i class="fa-regular fa-envelope me-1"></i>寄信</button>
         <button class="btn btn-info text-white" onclick="openSMSModal()"><i class="fa-regular fa-comment-dots me-1"></i>簡訊</button>
-        <button class="btn btn-outline-success btn-sm me-2" onclick="exportSmsCsv()">
+        <button class="btn btn-outline-success btn-sm me-2" onclick="exportSmsExcel()">
         <i class="fas fa-file-csv"></i> 簡訊批次檔
         </button>
         <button class="btn btn-danger" onclick="deleteSelected()"><i class="fa-regular fa-trash-can me-1"></i>刪除</button>
@@ -315,6 +316,7 @@
   <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/lang/summernote-zh-TW.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
   // ==========================================
@@ -653,9 +655,9 @@ function getSelectedIds() {
   return ids;
 }
 // ==========================================
-// 匯出 EVERY8D 簡訊批次檔 (CSV) - 呼叫後端產生縮網址
+// 匯出 EVERY8D 簡訊批次檔 (產生真正的 .xlsx)
 // ==========================================
-function exportSmsCsv() {
+function exportSmsExcel() {
   const selected = getSelectedIds();
   if (selected.length === 0) {
     alert("請先勾選要匯出簡訊名單的委員！");
@@ -663,38 +665,35 @@ function exportSmsCsv() {
   }
 
   // 避免重複點擊，將按鈕狀態改為「產生中」
-  const btn = document.querySelector('button[onclick="exportSmsCsv()"]');
+  const btn = document.querySelector('button[onclick="exportSmsExcel()"]');
   const originalText = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 縮網址產生中...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Excel產生中...';
   btn.disabled = true;
 
-  // 向 GAS 發送請求，要求後端產生帶有短網址的 CSV
+  // 向 GAS 發送請求
   fetch(API_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'adminExportSmsCsv', data: { ids: selected } })
+    body: JSON.stringify({ action: 'adminExportSmsData', data: { ids: selected } })
   })
   .then(response => response.json())
   .then(result => {
-    // 復原按鈕狀態
     btn.innerHTML = originalText;
     btn.disabled = false;
-    
-    // 取出回傳資料
+
     const resData = result.data ? result.data : result;
-    
-    if (result.status === 'success' && resData.csvContent) {
-      // 觸發瀏覽器下載檔案
-      const blob = new Blob([resData.csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      
+
+    if (result.status === 'success' && resData.excelData) {
+      // 使用 SheetJS 將陣列轉換為 Excel 工作表
+      const ws = XLSX.utils.aoa_to_sheet(resData.excelData);
+
+      // 建立一個新的 Excel 活頁簿，並將工作表塞進去
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "發送清單");
+
+      // 產生檔案名稱並觸發下載 (直接下載為 .xlsx)
       const timeString = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `簡訊發送清單_${timeString}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+      XLSX.writeFile(wb, `簡訊發送清單_${timeString}.xlsx`);
+
       alert("匯出成功！短網址已建立並寫入系統。");
     } else {
       alert("匯出失敗：" + (result.message || "未知錯誤"));

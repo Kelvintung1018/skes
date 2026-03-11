@@ -197,9 +197,13 @@
         const formData = new FormData(form);
         const dataObj = Object.fromEntries(formData.entries());
 
-        // 呼叫後端提交資料 (改用 fetch POST)
+// 呼叫後端提交資料 (改用 fetch POST)
         fetch(API_URL, {
           method: 'POST',
+          redirect: 'follow', // 允許跟隨 GAS 的重新導向
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8" // 偽裝成純文字，避免觸發 CORS 預檢請求
+          },
           body: JSON.stringify({ action: 'submitForm', data: dataObj })
         })
         .then(response => response.json())

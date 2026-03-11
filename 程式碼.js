@@ -2,7 +2,7 @@
 
 // ★★★ 請替換為您的 Web App 網址 (部署後取得) ★★★
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPaKHUAIE2yUB8kEijIKFYHcEaRl2ts0X2a9efGyZSAo2IsomLWJXkYRvPU_2GIM_B/exec";
-const FRONTEND_URL = "https://skestc.github.io/115exam";
+const FRONTEND_URL = "http://exam.skes.tc.edu.tw";
 const SHEET_NAME = "Candidates";
 const SETTINGS_SHEET_NAME = "Settings";
 
@@ -93,47 +93,7 @@ function doPost(e) {
   }
 }
 
-// ==========================================
-// 匯出 EVERY8D 簡訊批次檔 (準備 Excel 陣列資料)
-// ==========================================
-function adminExportSmsData(ids) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
-
-  // 建立表頭 (第一列)
-  const headers = ["姓名", "手機門號", "電子郵件", "傳送日期", "參數一", "參數二", "參數三", "參數四", "參數五"];
-  let exportData = [headers]; // 將表頭放入陣列第一列
-
-  for (let i = 1; i < data.length; i++) {
-    if (!ids.includes(data[i][0])) continue;
-
-    const row = data[i];
-    const name = row[1] || "";
-    const phoneRaw = row[11];
-    const phone = phoneRaw ? String(phoneRaw).replace(/[-\s]/g, "") : "";
-    const email = row[3] || "";
-    const title = row[13] || "";
-    const date = ""; // 留空表示即時發送
-
-    // 產生自建短網址
-    const longLink = FRONTEND_URL + "?uid=" + row[0];
-    const shortLink = createShortUrl(longLink); 
-
-    // 依序填入參數 (%field1%, %field2%, %field3%)
-    const p1 = name;
-    const p2 = title;
-    const p3 = shortLink;
-    const p4 = "";
-    const p5 = "";
-
-    // 將該名委員的資料打包成一列，加入大陣列中
-    exportData.push([name, phone, email, date, p1, p2, p3, p4, p5]);
-  }
-
-  // 將乾淨的陣列資料回傳給前端
-  return { status: 'success', excelData: exportData };
-}
-
+adminExportSmsData
 // ==========================================
 // 2. 系統設定與範本存取 (Settings)
 // ==========================================
@@ -763,14 +723,12 @@ function verifyLogin(username, password) {
 // 9. 系統自建縮網址功能
 // ==========================================
 function createShortUrl(longUrl) {
-  // 1. 產生 6 碼隨機英數短代碼
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let shortCode = '';
   for (let i = 0; i < 6; i++) {
     shortCode += chars.charAt(Math.floor(Math.random() * chars.length));
   }
 
-  // 2. 取得或建立 UrlShortener 分頁
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("UrlShortener");
   if (!sheet) {
@@ -779,11 +737,10 @@ function createShortUrl(longUrl) {
     sheet.setFrozenRows(1);
   }
 
-  // 3. 將資料寫入試算表
   sheet.appendRow([shortCode, longUrl, new Date(), 0]);
 
-  // 4. 回傳帶有短代碼的 Web App 網址
-  return FRONTEND_URL + "?s=" + shortCode;
+  // ★ 關鍵修改：把 "?s=" 拿掉，直接加上 "/" 和短代碼
+  return FRONTEND_URL + "/" + shortCode;
 }
 
 // ==========================================

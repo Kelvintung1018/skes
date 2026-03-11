@@ -93,6 +93,53 @@ function doPost(e) {
   }
 }
 
+
+// ==========================================
+// 匯出 EVERY8D 簡訊批次檔 (並更新聯絡狀態)
+// ==========================================
+function adminExportSmsData(ids) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  
+  // 自動尋找「聯絡狀態」是第幾個欄位 (以防欄位被移動)
+  // 如果您的欄位名稱叫「狀態」或其他名字，請自行修改下方的 "聯絡狀態"
+  const sheetHeaders = data[0];
+  const statusColIndex = sheetHeaders.indexOf("聯絡狀態"); 
+  
+  // 建立表頭 (第一列)
+  const headers = ["姓名", "手機門號", "電子郵件", "傳送日期", "參數一", "參數二", "參數三", "參數四", "參數五"];
+  let exportData = [headers]; 
+  
+  for (let i = 1; i < data.length; i++) {
+    if (!ids.includes(data[i][0])) continue;
+    
+    const row = data[i];
+    const name = row[1] || "";
+    const phoneRaw = row[11];
+    const phone = phoneRaw ? String(phoneRaw).replace(/[-\s]/g, "") : "";
+    const email = row[3] || "";
+    const title = row[13] || "";
+    const date = ""; 
+    
+    const longLink = FRONTEND_URL + "?uid=" + row[0];
+    let shortLink = createShortUrl(longLink); 
+    
+    const p1 = name;
+    const p2 = title;
+    const p3 = shortLink;  // 保留完整的 http://...
+    const p4 = "";
+    const p5 = "";
+
+    exportData.push([name, phone, email, date, p1, p2, p3, p4, p5]);
+    
+    // ★ 關鍵修改：將該名委員在試算表中的狀態更新為「批次簡訊」
+    if (statusColIndex !== -1) {
+      sheet.getRange(i + 1, statusColIndex + 1).setValue("批次簡訊");
+    }
+  }
+  
+  return { status: 'success', excelData: exportData };
+}
 // ==========================================
 // 2. 系統設定與範本存取 (Settings)
 // ==========================================

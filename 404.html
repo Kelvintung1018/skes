@@ -94,7 +94,7 @@
         // 從目前的網址中抓取參數
         const urlParams = new URLSearchParams(window.location.search);
         const uid = urlParams.get('uid'); 
-        const shortCode = urlParams.get('s'); // 新增：抓取短代碼參數
+        let shortCode = urlParams.get('s'); // 新增：抓取短代碼參數
         
         // ★ 新增這段：如果找不到 ?s=，就試著從網址路徑 (Path) 中抓取短代碼 ★
         if (!shortCode && !uid) {

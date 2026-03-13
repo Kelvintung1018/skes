@@ -114,7 +114,8 @@ function adminExportSmsData(ids) {
     const name = row[1] || "";
     const phoneRaw = row[11];
     const phone = phoneRaw ? String(phoneRaw).replace(/[-\s]/g, "") : "";
-    const email = row[3] || "";
+    //const email = row[3] || "";
+    const email = "";
     const title = row[13] || "";
     const date = "";
     const longLink = FRONTEND_URL + "?uid=" + row[0];
@@ -122,17 +123,20 @@ function adminExportSmsData(ids) {
     
     const p1 = name;
     const p2 = title;
-    const p3 = shortLink;
+    
+    // ★ 關鍵修改：利用 replace 將開頭的 http:// 或 https:// 替換為空字串
+    const p3 = shortLink.replace(/^http?:\/\//i, ''); 
+    
     const p4 = "";
     const p5 = "";
     exportData.push([name, phone, email, date, p1, p2, p3, p4, p5]);
     
-    // ★ 關鍵修改1：將該名委員在試算表中的狀態更新為「批次簡訊」
+    // 更新狀態為「批次簡訊」
     if (statusColIndex !== -1) {
       sheet.getRange(i + 1, statusColIndex + 1).setValue("批次簡訊");
     }
     
-    // ★ 關鍵修改2：比照直接發送簡訊，寫入當前時間至第 15 欄 (簡訊狀態)
+    // (保留功能) 寫入當前時間至第 15 欄 (簡訊狀態)
     sheet.getRange(i + 1, 15).setValue(new Date());
   }
   

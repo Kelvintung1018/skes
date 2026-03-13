@@ -689,18 +689,8 @@ function exportSmsExcel() {
       const timeString = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       XLSX.writeFile(wb, `簡訊發送清單_${timeString}.xlsx`);
       
-      // ★ 2. 更新前端的資料與畫面
-      selected.forEach(id => {
-        const row = globalData.list.find(r => r.uid === id);
-        if (row) {
-          row.status = "批次簡訊"; // 更新全域變數中的狀態
-        }
-      });
-      
-      // 重新渲染表格以顯示最新狀態 (假設您的渲染函式名稱為 renderTable)
-      if (typeof renderTable === "function") {
-        renderTable(); 
-      }
+// ★ 2. 修正：直接呼叫 reloadData() 讓畫面重新向後端要最新資料 (包含剛剛寫入的時間)
+      reloadData();
       
       // 貼心小功能：匯出完成後，自動把剛剛打勾的 checkbox 全部取消
       document.querySelectorAll('tbody input[type="checkbox"]:checked').forEach(cb => {
@@ -710,7 +700,7 @@ function exportSmsExcel() {
       const selectAllCb = document.getElementById('selectAll');
       if (selectAllCb) selectAllCb.checked = false;
 
-      alert("匯出成功！狀態已更新為「批次簡訊」。");
+      alert("匯出成功！狀態與簡訊發送時間已更新。");
     } else {
       alert("匯出失敗：" + (result.message || "未知錯誤"));
     }

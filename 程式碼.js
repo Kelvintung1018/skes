@@ -599,7 +599,7 @@ function submitForm(f) {
       if (f.willingness === "yes") {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_YES');
         if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>願意擔任</strong>的回覆。<br>科別：{{subjectCategory}}<br>飲食：{{diet}}<br>備註：{{memo}}</p>";
-        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title).replace(/{{subject}}/g, subjectCategory).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
+        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title).replace(/{{subjectCategory}}/g, subjectCategory).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
       } else {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_NO');
         if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>無法擔任</strong>的回覆。感謝您的支持。</p>";

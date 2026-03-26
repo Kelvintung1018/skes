@@ -431,6 +431,7 @@ function adminResendEmails(ids) {
         const uuid = data[i][0];
         const name = data[i][1];
         const email = data[i][3];
+        const subjectCategory = data[i][2];
         const title = data[i][13];
         const longLink = FRONTEND_URL + "?uid=" + uuid;
         //const shortLink = getShortUrl(longLink); 
@@ -438,6 +439,7 @@ function adminResendEmails(ids) {
 
         let body = templateStr
           .replace(/{{name}}/g, name)
+          .replace(/{{subjectCategory}}/g, subjectCategory)
           .replace(/{{link}}/g, shortLink)
           .replace(/{{title}}/g, title)
           .replace(/<\?= name \?>/g, name)
@@ -589,14 +591,15 @@ function submitForm(f) {
   try {
     const name = data[targetRowIndex][1];
     const email = data[targetRowIndex][3];
+    const subjectCategory = data[targetRowIndex][2];
     const title = data[targetRowIndex][13] || "";
     if (email && email.includes("@")) {
       const subject = "【教甄委員會】已收到您的意願回覆 - 確認通知";
       let body = "";
       if (f.willingness === "yes") {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_YES');
-        if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>願意擔任</strong>的回覆。<br>飲食：{{diet}}<br>備註：{{memo}}</p>";
-        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
+        if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>願意擔任</strong>的回覆。<br>科別：{{subjectCategory}}<br>飲食：{{diet}}<br>備註：{{memo}}</p>";
+        body = tpl.replace(/{{name}}/g, name).replace(/{{title}}/g, title).replace(/{{subject}}/g, subjectCategory).replace(/{{diet}}/g, f.diet || '未填寫').replace(/{{memo}}/g, f.memo || '無');
       } else {
         let tpl = getSettingValue('TEMPLATE_EMAIL_CONFIRM_NO');
         if (!tpl) tpl = "<p>{{name}}  {{title}} 您好：<br>已收到您<strong>無法擔任</strong>的回覆。感謝您的支持。</p>";
